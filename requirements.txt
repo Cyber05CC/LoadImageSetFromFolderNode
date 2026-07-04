@@ -1,0 +1,3 @@
+# No additional Python packages are required.
+# This extension uses dependencies that are already included in standard ComfyUI training environments:
+# torch, numpy, Pillow, and safetensors.
