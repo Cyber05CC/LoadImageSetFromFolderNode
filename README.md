@@ -115,10 +115,12 @@ The extension includes a small frontend helper in `web/load_image_set_zip_upload
 
 It adds:
 
-- `Choose .zip` button on `Load Image Set From Folder`;
-- `Download latest ZIP` button on `RunningHub LoRA Export`.
+- `Upload ZIP | RHUB` button on `Load Image Set From Folder`;
+- `Upload ZIP` button on `Load Image Set From Folder`;
+- `Download ZIP | RHUB` button on `RunningHub LoRA Export`;
+- `Download ZIP` button on `RunningHub LoRA Export`.
 
-If a cloud platform blocks custom frontend JavaScript, the Python nodes still save files to ComfyUI `output`.
+If a cloud platform blocks custom frontend JavaScript, the visual buttons will not render, but the Python nodes still save exported files under ComfyUI `output`.
 
 ## Installation
 

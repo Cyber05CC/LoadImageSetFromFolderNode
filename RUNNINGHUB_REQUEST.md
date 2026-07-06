@@ -14,7 +14,7 @@ The package includes:
 - automatic image and caption preparation for LoRA training;
 - a LoRA training node with intermediate `.safetensors` checkpoint saving;
 - an export node that packages the final LoRA, loss graph, metadata, and intermediate checkpoints into a downloadable ZIP file;
-- optional frontend helper buttons for ZIP upload and downloading the final exported ZIP.
+- optional frontend helper buttons for ZIP upload and final ZIP download.
 
 The main reason for this request is that standard folder-path based dataset loaders are difficult to use on RunningHub, because users often cannot access or manage internal paths directly. This package avoids that problem by using ZIP-based datasets and exporting all final results into ComfyUI's standard output directory.
 

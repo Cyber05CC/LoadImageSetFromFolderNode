@@ -34,13 +34,8 @@ function setComboValue(widget, value) {
     }
 }
 
-function addZipUploadButton(node) {
-    if (node.__runninghubZipUploadAdded) {
-        return;
-    }
-    node.__runninghubZipUploadAdded = true;
-
-    const uploadWidget = node.addWidget("button", "upload_dataset_zip", "Choose .zip", async () => {
+function addZipUploadButton(node, label) {
+    const uploadWidget = node.addWidget("button", label, label, async () => {
         const widget = findDatasetWidget(node);
         if (!widget) {
             alert("dataset_zip widget not found.");
@@ -84,6 +79,16 @@ function addZipUploadButton(node) {
     uploadWidget.serialize = false;
 }
 
+function addZipUploadButtons(node) {
+    if (node.__runninghubZipUploadAdded) {
+        return;
+    }
+    node.__runninghubZipUploadAdded = true;
+
+    addZipUploadButton(node, "Upload ZIP | RHUB");
+    addZipUploadButton(node, "Upload ZIP");
+}
+
 function makeOutputDownloadUrl(fileInfo) {
     const params = new URLSearchParams();
     params.set("filename", fileInfo.filename);
@@ -105,13 +110,8 @@ function downloadFile(fileInfo) {
     anchor.remove();
 }
 
-function addExportDownloadButtons(node) {
-    if (node.__runninghubExportButtonsAdded) {
-        return;
-    }
-    node.__runninghubExportButtonsAdded = true;
-
-    const downloadWidget = node.addWidget("button", "download_latest_zip", "Download latest ZIP", () => {
+function addExportDownloadButton(node, label) {
+    const downloadWidget = node.addWidget("button", label, label, () => {
         const fileInfo = node.__runninghubLatestDownload;
         if (!fileInfo) {
             alert("No exported ZIP yet. Run the workflow first.");
@@ -120,6 +120,16 @@ function addExportDownloadButtons(node) {
         downloadFile(fileInfo);
     });
     downloadWidget.serialize = false;
+}
+
+function addExportDownloadButtons(node) {
+    if (node.__runninghubExportButtonsAdded) {
+        return;
+    }
+    node.__runninghubExportButtonsAdded = true;
+
+    addExportDownloadButton(node, "Download ZIP | RHUB");
+    addExportDownloadButton(node, "Download ZIP");
 }
 
 function rememberExportDownloads(node, message) {
@@ -140,7 +150,7 @@ app.registerExtension({
             const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 originalOnNodeCreated?.apply(this, arguments);
-                addZipUploadButton(this);
+                addZipUploadButtons(this);
             };
             return;
         }
