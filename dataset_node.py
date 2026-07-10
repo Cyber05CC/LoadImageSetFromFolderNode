@@ -17,14 +17,31 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 ZIP_EXTENSIONS = {".zip"}
 
 
+def walk_files(root_dir):
+    try:
+        for root, _, files in os.walk(root_dir, onerror=lambda err: logging.warning("Cannot read %s: %s", err.filename, err)):
+            for filename in files:
+                yield root, filename
+    except OSError as err:
+        logging.warning("Cannot scan %s: %s", root_dir, err)
+
+
+def find_input_zips():
+    input_dir = folder_paths.get_input_directory()
+    zip_paths = []
+    for root, filename in walk_files(input_dir):
+        if os.path.splitext(filename)[1].lower() in ZIP_EXTENSIONS:
+            zip_paths.append(os.path.join(root, filename))
+    zip_paths.sort(key=lambda path: os.path.getmtime(path), reverse=True)
+    return zip_paths
+
+
 def list_input_zips():
     input_dir = folder_paths.get_input_directory()
-    zip_files = []
-    for root, _, files in os.walk(input_dir):
-        for filename in files:
-            if os.path.splitext(filename)[1].lower() in ZIP_EXTENSIONS:
-                full_path = os.path.join(root, filename)
-                zip_files.append(os.path.relpath(full_path, input_dir).replace("\\", "/"))
+    zip_files = [
+        os.path.relpath(path, input_dir).replace("\\", "/")
+        for path in find_input_zips()
+    ]
     zip_files.sort(key=str.lower)
     return zip_files or ["upload_dataset.zip"]
 
@@ -44,6 +61,35 @@ def get_input_file_path(filename):
     )
 
 
+def resolve_dataset_source(dataset_zip):
+    try:
+        return "zip", get_input_file_path(dataset_zip)
+    except FileNotFoundError as first_error:
+        zip_paths = find_input_zips()
+        if zip_paths:
+            fallback_zip = zip_paths[0]
+            logging.warning(
+                "Selected dataset zip was not found (%s). Using newest uploaded zip instead: %s",
+                dataset_zip,
+                fallback_zip,
+            )
+            return "zip", fallback_zip
+
+        input_dir = folder_paths.get_input_directory()
+        if folder_has_images(input_dir):
+            logging.warning(
+                "No dataset zip found. Falling back to image/caption files uploaded directly in ComfyUI/input: %s",
+                input_dir,
+            )
+            return "folder", input_dir
+
+        available = list_input_zips()
+        raise FileNotFoundError(
+            f"{first_error}\nNo fallback dataset zip or uploaded image/caption set was found in ComfyUI/input. "
+            f"Visible dataset zip choices: {available}"
+        )
+
+
 def safe_zip_names(zip_file):
     names = []
     for info in zip_file.infolist():
@@ -57,10 +103,21 @@ def safe_zip_names(zip_file):
     return names
 
 
+def safe_relpath(path, base_dir):
+    return os.path.relpath(path, base_dir).replace("\\", "/")
+
+
 def caption_key(path):
     directory, filename = os.path.split(path.replace("\\", "/"))
     stem, _ = os.path.splitext(filename)
     return f"{directory}/{stem}".strip("/")
+
+
+def folder_has_images(dataset_dir):
+    for _, filename in walk_files(dataset_dir):
+        if os.path.splitext(filename)[1].lower() in IMAGE_EXTENSIONS:
+            return True
+    return False
 
 
 def read_dataset_zip(zip_path, width, height, resize_mode):
@@ -109,6 +166,63 @@ def read_dataset_zip(zip_path, width, height, resize_mode):
             captions.append(caption)
 
     return tensors, captions
+
+
+def read_dataset_folder(dataset_dir, width, height, resize_mode):
+    text_by_path = {}
+    image_paths = []
+
+    for root, filename in walk_files(dataset_dir):
+        full_path = os.path.join(root, filename)
+        rel_path = safe_relpath(full_path, dataset_dir)
+        extension = os.path.splitext(filename)[1].lower()
+        if extension in IMAGE_EXTENSIONS:
+            image_paths.append(full_path)
+        elif extension == ".txt":
+            text_by_path[rel_path.lower()] = full_path
+
+    image_paths.sort(key=lambda path: safe_relpath(path, dataset_dir).lower())
+    if not image_paths:
+        raise ValueError(f"No images found in uploaded dataset folder: {dataset_dir}")
+
+    tensors = []
+    captions = []
+    for image_path in image_paths:
+        rel_image = safe_relpath(image_path, dataset_dir)
+        with Image.open(image_path) as image:
+            image = ImageOps.exif_transpose(image).convert("RGB")
+            image = resize_dataset_image(image, width, height, resize_mode)
+            array = np.asarray(image).astype(np.float32) / 255.0
+            tensors.append(torch.from_numpy(array))
+
+        key = caption_key(rel_image)
+        caption_candidates = [
+            f"{key}.txt".lower(),
+            f"{rel_image}.txt".lower(),
+            f"{os.path.dirname(rel_image)}/caption.txt".strip("/").lower(),
+            "caption.txt",
+        ]
+        caption_path = None
+        for candidate in caption_candidates:
+            if candidate in text_by_path:
+                caption_path = text_by_path[candidate]
+                break
+        if caption_path is None:
+            raise FileNotFoundError(
+                f"Missing caption for {rel_image}. Expected {key}.txt in the uploaded dataset."
+            )
+        with open(caption_path, "r", encoding="utf-8", errors="replace") as f:
+            captions.append(f.read().strip())
+
+    return tensors, captions
+
+
+def read_dataset_source(source_type, source_path, width, height, resize_mode):
+    if source_type == "zip":
+        return read_dataset_zip(source_path, width, height, resize_mode)
+    if source_type == "folder":
+        return read_dataset_folder(source_path, width, height, resize_mode)
+    raise ValueError(f"Unsupported dataset source type: {source_type}")
 
 
 def resize_dataset_image(image, width, height, resize_mode):
@@ -353,8 +467,8 @@ class LoadImageSetFromFolderNode:
         height,
         vae_batch_size,
     ):
-        zip_path = get_input_file_path(dataset_zip)
-        tensors, captions = read_dataset_zip(zip_path, width, height, resize_mode)
+        source_type, source_path = resolve_dataset_source(dataset_zip)
+        tensors, captions = read_dataset_source(source_type, source_path, width, height, resize_mode)
 
         shapes = {tuple(tensor.shape) for tensor in tensors}
         if len(shapes) != 1:
@@ -365,7 +479,7 @@ class LoadImageSetFromFolderNode:
         conditioning = encode_caption_list(clip, captions)
         images = torch.stack(tensors, dim=0)
         latents = {"samples": encode_images_in_batches(vae, images, vae_batch_size)}
-        logging.info("Loaded dataset %s: %s images", zip_path, len(tensors))
+        logging.info("Loaded dataset %s (%s): %s images", source_path, source_type, len(tensors))
         return latents, conditioning, images, len(tensors)
 
 

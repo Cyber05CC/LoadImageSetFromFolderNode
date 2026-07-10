@@ -1886,7 +1886,6 @@ class TrainingExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         return [
-            LoadImageSetFromFolderNode,
             TrainLoraNode,
             LoraModelLoader,
             SaveLoRA,
@@ -1899,11 +1898,9 @@ async def comfy_entrypoint() -> TrainingExtension:
 
 
 NODE_CLASS_MAPPINGS = {
-    "LoadImageSetFromFolderNode": LoadImageSetFromFolderLegacy,
     "TrainLoraCheckpointedNode": TrainLoraCheckpointedNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LoadImageSetFromFolderNode": "Load Image Set From Folder",
     "TrainLoraCheckpointedNode": "Train LoRA Checkpointed",
 }

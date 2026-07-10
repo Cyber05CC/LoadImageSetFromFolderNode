@@ -7,6 +7,8 @@ Custom ComfyUI nodes for LoRA training workflows on restricted cloud platforms s
 This extension provides a self-contained LoRA training workflow that can:
 
 - upload/select a dataset `.zip`;
+- fall back to the newest uploaded `.zip` in ComfyUI `input` if the selected placeholder file is missing;
+- read directly uploaded image + caption files from ComfyUI `input` when no dataset ZIP is available;
 - read paired image and `.txt` caption files;
 - encode images and captions for training;
 - train a LoRA with intermediate checkpoints;
@@ -52,6 +54,12 @@ Caption matching:
 - `image_001.png` -> `image_001.txt`
 - `image_001.png` -> `image_001.png.txt`
 - folder-level fallback: `caption.txt`
+
+Cloud fallback behavior:
+
+- If `dataset_zip` points to a missing placeholder such as `upload_dataset.zip`, the node uses the newest `.zip` file found in ComfyUI `input`.
+- If there is no `.zip`, the node can read uploaded image and matching caption `.txt` files directly from ComfyUI `input`.
+- No user-entered absolute folder path is required.
 
 ### Train LoRA Checkpointed
 

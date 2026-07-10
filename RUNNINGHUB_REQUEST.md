@@ -18,6 +18,8 @@ The package includes:
 
 The main reason for this request is that standard folder-path based dataset loaders are difficult to use on RunningHub, because users often cannot access or manage internal paths directly. This package avoids that problem by using ZIP-based datasets and exporting all final results into ComfyUI's standard output directory.
 
+The dataset node does not require a user-entered absolute folder path. If the selected placeholder ZIP is not present, it falls back to the newest uploaded ZIP in ComfyUI `input`. If no ZIP is available, it can read directly uploaded image and matching caption TXT files from ComfyUI `input`.
+
 Expected user workflow:
 
 1. Upload/select a dataset ZIP.
